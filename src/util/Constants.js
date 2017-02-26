@@ -3,24 +3,27 @@ exports.Package = require('../../package.json');
 /**
  * Options for a Client.
  * @typedef {Object} ClientOptions
- * @property {string} [apiRequestMethod='sequential'] 'sequential' or 'burst'. Sequential executes all requests in
- * the order they are triggered, whereas burst runs multiple at a time, and doesn't guarantee a particular order.
- * @property {number} [shardId=0] The ID of this shard
- * @property {number} [shardCount=0] The number of shards
+ * @property {string} [apiRequestMethod='sequential'] One of `sequential` or `burst`. The sequential handler executes
+ * all requests in the order they are triggered, whereas the burst handler runs multiple in parallel, and doesn't
+ * provide the guarantee of any particular order.
+ * <warn>Burst mode is more likely to hit a 429 ratelimit by its nature,
+ * be advised if you are very unlucky you could be IP banned</warn>
+ * @property {number} [shardId=0] ID of the shard to run
+ * @property {number} [shardCount=0] Total number of shards
  * @property {number} [messageCacheMaxSize=200] Maximum number of messages to cache per channel
  * (-1 or Infinity for unlimited - don't do this without message sweeping, otherwise memory usage will climb
  * indefinitely)
- * @property {number} [messageCacheLifetime=0] How long until a message should be uncached by the message sweeping
- * (in seconds, 0 for forever)
+ * @property {number} [messageCacheLifetime=0] How long a message should stay in the cache until it is considered
+ * sweepable (in seconds, 0 for forever)
  * @property {number} [messageSweepInterval=0] How frequently to remove messages from the cache that are older than
  * the message cache lifetime (in seconds, 0 for never)
  * @property {boolean} [fetchAllMembers=false] Whether to cache all guild members and users upon startup, as well as
- * upon joining a guild
- * @property {boolean} [disableEveryone=false] Default value for MessageOptions.disableEveryone
- * @property {boolean} [sync=false] Whether to periodically sync guilds (for userbots)
+ * upon joining a guild (should be avoided whenever possible)
+ * @property {boolean} [disableEveryone=false] Default value for {@link MessageOptions#disableEveryone}
+ * @property {boolean} [sync=false] Whether to periodically sync guilds (for user accounts)
  * @property {number} [restWsBridgeTimeout=5000] Maximum time permitted between REST responses and their
  * corresponding websocket events
- * @property {number} [restTimeOffset=500] The extra time in millseconds to wait before continuing to make REST
+ * @property {number} [restTimeOffset=500] Extra time in millseconds to wait before continuing to make REST
  * requests (higher values will reduce rate-limiting errors on bad connections)
  * @property {WSEventType[]} [disabledEvents] An array of disabled websocket events. Events in this array will not be
  * processed, potentially resulting in performance improvements for larger bots. Only disable events you are
@@ -43,11 +46,11 @@ exports.DefaultOptions = {
   restTimeOffset: 500,
 
   /**
-   * Websocket options. These are left as snake_case to match the API.
+   * Websocket options (these are left as snake_case to match the API)
    * @typedef {Object} WebsocketOptions
    * @property {number} [large_threshold=250] Number of members in a guild to be considered large
-   * @property {boolean} [compress=true] Whether to compress data sent on the connection.
-   * Defaults to `false` for browsers.
+   * @property {boolean} [compress=true] Whether to compress data sent on the connection
+   * (defaults to `false` for browsers)
    */
   ws: {
     large_threshold: 250,
@@ -100,6 +103,7 @@ const Endpoints = exports.Endpoints = {
   },
   me: `${API}/users/@me`,
   meGuild: (guildID) => `${Endpoints.me}/guilds/${guildID}`,
+  meChannels: `${API}/users/@me/channels`,
   meMentions: (limit, roles, everyone, guildID) =>
     `users/@me/mentions?limit=${limit}&roles=${roles}&everyone=${everyone}${guildID ? `&guild_id=${guildID}` : ''}`,
   relationships: (userID) => `${Endpoints.user(userID)}/relationships`,
@@ -140,6 +144,8 @@ const Endpoints = exports.Endpoints = {
   channelWebhooks: (channelID) => `${Endpoints.channel(channelID)}/webhooks`,
   channelSearch: (channelID) => `${Endpoints.channelMessages(channelID)}/search`,
 
+  dmChannelRecipient: (channelID, recipientID) => `${Endpoints.channel(channelID)}/recipients/${recipientID}`,
+
   // message reactions
   messageReactions: (channelID, messageID) => `${Endpoints.channelMessage(channelID, messageID)}/reactions`,
   messageReaction:
@@ -155,13 +161,23 @@ const Endpoints = exports.Endpoints = {
   webhook: (webhookID, token) => `${API}/webhooks/${webhookID}${token ? `/${token}` : ''}`,
 
   // oauth
-  myApplication: `${API}/oauth2/applications/@me`,
+  oauth2Application: (appID) => `${API}/oauth2/applications/${appID}`,
   getApp: (id) => `${API}/oauth2/authorize?client_id=${id}`,
 
   // emoji
   emoji: (emojiID) => `${Endpoints.CDN}/emojis/${emojiID}.png`,
 };
 
+/**
+ * The current status of the client. Here are the available statuses:
+ * - READY
+ * - CONNECTING
+ * - RECONNECTING
+ * - IDLE
+ * - NEARLY
+ * - DISCONNECTED
+ * @typedef {number} Status
+ */
 exports.Status = {
   READY: 0,
   CONNECTING: 1,
@@ -171,11 +187,28 @@ exports.Status = {
   DISCONNECTED: 5,
 };
 
+/**
+ * The current status of a voice connection. Here are the available statuses:
+ * - CONNECTED
+ * - CONNECTING
+ * - AUTHENTICATING
+ * - RECONNECTING
+ * - DISCONNECTED
+ * @typedef {number} VoiceStatus
+ */
+exports.VoiceStatus = {
+  CONNECTED: 0,
+  CONNECTING: 1,
+  AUTHENTICATING: 2,
+  RECONNECTING: 3,
+  DISCONNECTED: 4,
+};
+
 exports.ChannelTypes = {
-  text: 0,
+  TEXT: 0,
   DM: 1,
-  voice: 2,
-  groupDM: 3,
+  VOICE: 2,
+  GROUP_DM: 3,
 };
 
 exports.OPCodes = {
