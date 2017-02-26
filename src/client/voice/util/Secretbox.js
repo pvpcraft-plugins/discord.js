@@ -1,8 +1,13 @@
 try {
-  const sodium = require('sodium');
+  const tweetnacl = require('tweetnacl');
+  const sodium = require('sodium-native');
   module.exports = {
-    open: sodium.api.crypto_secretbox_open,
-    close: sodium.api.crypto_secretbox,
+    open: tweetnacl.secretbox.open,
+    close: function (secretMessage, nonce, secretKey) {
+      let cipher = new Buffer(secretMessage.length);
+      sodium.api.crypto_secretbox_easy(cipher, secretMessage, nonce, secretKey);
+      return cipher;
+    }
   };
 } catch (err) {
   const tweetnacl = require('tweetnacl');
